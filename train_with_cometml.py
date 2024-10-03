@@ -29,9 +29,8 @@ import torchvision.transforms.functional as F
 from models.realignment_layer import realignment_layer
 
 import dataset
-import dataset.kitti_odometry_remote
-from models.lvt_effnet import TransCalib_lvt_efficientnet_june2
-from models.lvt_effnet_light_v1 import TransCalib_lvt_efficientnet_july18
+import dataset.kitti_odometry_v2
+from models.full_models import UTransCalib_model_densenet, UTransCalib_model_resnet, UTransCalib_model_lite
 import criteria
 
 from config.model_config import *
@@ -51,10 +50,10 @@ SKIP_FRAMES = 2
 RESIZE_IMG = (192, 640)
 BATCH_SIZE = 16
 DEVICE = "cuda:0" if torch.cuda.is_available() else "cpu"
-MODEL_CONFIG = config_lvt_effnet_light_v1_july18
+MODEL_CONFIG = config_UTransCalib_resnet_oct4
 MODEL_CONFIG_CL = DotWiz(MODEL_CONFIG)
-MODEL_CLASS = TransCalib_lvt_efficientnet_july18(MODEL_CONFIG_CL)
-LOAD_MODEL = True
+MODEL_CLASS = UTransCalib_model_resnet(MODEL_CONFIG_CL)
+LOAD_MODEL = False
 MODEL_NAME = MODEL_CONFIG_CL.model_name
 MODEL_DATE = datetime.now().strftime('%Y%m%d_%H%M%S')
 CAM_ID = "2"
@@ -456,9 +455,10 @@ if __name__ == "__main__":
                                T.Normalize(mean=[0.33, 0.36, 0.33], 
                                            std=[0.30, 0.31, 0.32])])
     
-    depth_transform = T.Compose([T.Resize((RESIZE_IMG[0], RESIZE_IMG[1])),
-                                 T.Normalize(mean=[0.0404], 
-                                             std=[6.792])])
+    depth_transform = T.Resize((RESIZE_IMG[0], RESIZE_IMG[1]))
+    # depth_transform = T.Compose([T.Resize((RESIZE_IMG[0], RESIZE_IMG[1])),
+    #                              T.Normalize(mean=[0.0404], 
+    #                                          std=[6.792])])
 
     ### Load the data from csv file
     ds_train = dataset.KITTI_Odometry(rootdir=DATASET_FILEPATH,
@@ -531,7 +531,7 @@ if __name__ == "__main__":
     # Criteria
     reg_loss = criteria.regression_loss().to(DEVICE)
     rot_loss = criteria.rotation_loss().to(DEVICE)
-    pcd_loss = criteria.chamfer_distance_loss(scale=.1).to(DEVICE)
+    pcd_loss = criteria.pcd_distance_loss(scale=1.).to(DEVICE)
     criterion = [reg_loss, rot_loss, pcd_loss]
 
     # criterion = nn.MSELoss(reduction='mean').cuda()

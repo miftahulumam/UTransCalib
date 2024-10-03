@@ -5,24 +5,30 @@ from timm.models.layers import trunc_normal_
 from models.realignment_layer import realignment_layer
 import torch.nn.functional as F
 
+from dotwiz import DotWiz
+
 from .encoders import encoder_densenet, encoder_resnet, encoder_lite
 from .decoders import decoder_full, decoder_3_stage, decoder_2_stage
 from .fusions import feature_fusion_full, feature_fusion_3maps, feature_fusion_2maps
 from .heads import global_regression_v1
 
 class UTransCalib_model_resnet(nn.Module):
-    def __init__(self, init_weights=True):
+    def __init__(self, model_config):
         super(UTransCalib_model_resnet, self).__init__()
+
+        activation = model_config.activation
+        init_weights = model_config.init_weights
 
         self.rgb_encd = encoder_resnet(pretrained=True)
         self.depth_encd = encoder_resnet(pretrained=False, depth_branch=True)
 
-        self.rgb_decdr = decoder_3_stage(in_ch=512, depthwise=True)
-        self.depth_dcdr = decoder_3_stage(in_ch=512, depthwise=True)
+        self.rgb_decdr = decoder_3_stage(in_ch=512, depthwise=True, activation=activation)
+        self.depth_dcdr = decoder_3_stage(in_ch=512, depthwise=True, activation=activation)
 
         self.fusion_module = feature_fusion_3maps(max_channel=1024, 
                                                   fc_reduction=16,
-                                                  depthwise=True)
+                                                  depthwise=True,
+                                                  activation=activation)
         
         self.global_regression = global_regression_v1(max_channel=1024,
                                                       depthwise=True)
@@ -67,14 +73,17 @@ class UTransCalib_model_resnet(nn.Module):
         return pcd_pred, batch_T_pred, delta_q_pred, delta_t_pred
 
 class UTransCalib_model_densenet(nn.Module):
-    def __init__(self, init_weights=True):
+    def __init__(self, model_config):
         super(UTransCalib_model_densenet, self).__init__()
+
+        activation = model_config.activation
+        init_weights = model_config.init_weights
 
         self.rgb_encd = encoder_densenet(pretrained=True)
         self.depth_encd = encoder_densenet(pretrained=False, depth_branch=True)
 
-        self.rgb_decdr = decoder_full(in_ch=1024, depthwise=True)
-        self.depth_dcdr = decoder_full(in_ch=1024, depthwise=True)
+        self.rgb_decdr = decoder_full(in_ch=1024, depthwise=True, activation=activation)
+        self.depth_dcdr = decoder_full(in_ch=1024, depthwise=True, activation=activation)
 
         self.fusion_module = feature_fusion_full(max_channel=2048, 
                                                  fc_reduction=16,
@@ -125,18 +134,22 @@ class UTransCalib_model_densenet(nn.Module):
 
 
 class UTransCalib_model_lite(nn.Module):
-    def __init__(self, init_weights=True):
+    def __init__(self, model_config):
         super(UTransCalib_model_lite, self).__init__()
 
-        self.rgb_encd = encoder_lite()
-        self.depth_encd = encoder_lite(depth_branch=True)
+        activation = model_config.activation
+        init_weights = model_config.init_weights
 
-        self.rgb_decdr = decoder_3_stage(in_ch=512, depthwise=True)
-        self.depth_dcdr = decoder_3_stage(in_ch=512, depthwise=True)
+        self.rgb_encd = encoder_lite(act_layer=activation)
+        self.depth_encd = encoder_lite(depth_branch=True, act_layer=activation)
+
+        self.rgb_decdr = decoder_3_stage(in_ch=512, depthwise=True, activation=activation)
+        self.depth_dcdr = decoder_3_stage(in_ch=512, depthwise=True, activation=activation)
 
         self.fusion_module = feature_fusion_3maps(max_channel=1024, 
                                                   fc_reduction=16,
-                                                  depthwise=True)
+                                                  depthwise=True,
+                                                  activation=activation)
         
         self.global_regression = global_regression_v1(max_channel=1024,
                                                       depthwise=True)

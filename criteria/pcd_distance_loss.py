@@ -45,7 +45,7 @@ class pcd_distance_loss(nn.Module):
         self.scale = scale
 
     def forward(self, p1, p2):
-        total_loss = torch.tensor([0.0])
+        total_loss = torch.tensor([0.0]).to(p1[0].device)
         for i in range(len(p1)):
             pcd1 = p1[i]*self.scale
             pcd2 = p2[i]*self.scale
