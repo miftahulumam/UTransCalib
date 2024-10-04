@@ -531,7 +531,7 @@ if __name__ == "__main__":
     # Criteria
     reg_loss = criteria.regression_loss().to(DEVICE)
     rot_loss = criteria.rotation_loss().to(DEVICE)
-    pcd_loss = criteria.pcd_distance_loss(scale=1.).to(DEVICE)
+    pcd_loss = criteria.pcd_distance_loss(scale=.1).to(DEVICE)
     criterion = [reg_loss, rot_loss, pcd_loss]
 
     # criterion = nn.MSELoss(reduction='mean').cuda()
