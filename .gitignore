@@ -4,4 +4,6 @@ __pycache__/*
 cek_dset.py
 checkpoint_weights/*
 cek_model.py
-./kitti_odometry_presaved_dset
+kitti_odometry_presaved_dset/
+kittiodom_test
+kittiodom_test_2
