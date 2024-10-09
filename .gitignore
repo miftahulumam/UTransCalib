@@ -4,3 +4,4 @@ __pycache__/*
 cek_dset.py
 checkpoint_weights/*
 cek_model.py
+./kitti_odometry_presaved_dset
