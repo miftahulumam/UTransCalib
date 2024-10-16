@@ -192,3 +192,44 @@ class UTransCalib_model_lite(nn.Module):
         batch_T_pred, pcd_pred = self.recalib(pcd_mis, T_mis_batch, delta_q_pred, delta_t_pred)
 
         return pcd_pred, batch_T_pred, delta_q_pred, delta_t_pred
+    
+class UTranscalib_densenet_attn(nn.Module):
+    def __init__(self, model_config):
+        super(UTranscalib_densenet_attn, self).__init__()
+
+        activation = model_config.activation
+        init_weights = model_config.init_weights
+
+        self.rgb_encd = encoder_densenet(pretrained=True)
+        self.depth_encd = encoder_densenet(pretrained=False, depth_branch=True)
+
+        self.rgb_decdr = decoder_3_stage(in_ch=1024, depthwise=True, activation=activation)
+        self.depth_dcdr = decoder_3_stage(in_ch=1024, depthwise=True, activation=activation)
+
+        
+
+        if init_weights:
+            for m in self.modules():
+                if isinstance(m, (nn.Conv2d, nn.Linear)):
+                    nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+
+                elif isinstance(m, nn.LayerNorm):
+                    nn.init.constant_(m.bias, 0)
+                    nn.init.constant_(m.weight, 1.0)
+
+                elif isinstance(m, nn.BatchNorm2d):
+                    nn.init.constant_(m.weight, 1)
+                    nn.init.constant_(m.bias, 0)
+
+    def forward(self, rgb_im, depth_im, pcd_mis, T_mis_batch):
+        _, x2_rgb, x3_rgb, x4_rgb = self.rgb_encd(rgb_im)
+        _, x2_depth, x3_depth, x4_depth = self.depth_encd(depth_im)
+
+        x2_rgb, x3_rgb, x4_rgb = self.rgb_decdr(x2_rgb, x3_rgb, x4_rgb)
+        x2_depth, x3_depth, x4_depth = self.depth_dcdr(x2_depth, x3_depth, x4_depth)
+
+        x2 = torch.cat((x2_rgb, x2_depth), dim=1)
+        x3 = torch.cat((x3_rgb, x3_depth), dim=1)
+        x4 = torch.cat((x4_rgb, x4_depth), dim=1)
+
+        return x2, x3, x4

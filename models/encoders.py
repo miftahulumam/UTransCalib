@@ -5,7 +5,7 @@ from timm.models.layers import trunc_normal_
 from models.realignment_layer import realignment_layer
 import torch.nn.functional as F
 
-from torchvision.models import resnet18, densenet121
+from torchvision.models import resnet18, densenet121, mobilenet_v3_small
 
 class encoder_resnet(nn.Module):
     def __init__(self, pretrained = True, depth_branch = False):
@@ -82,6 +82,39 @@ class encoder_densenet(nn.Module):
 
         return x1, x2, x3, x4
     
+class encoder_mobilenet_small(nn.Module):
+    def __init__(self, pretrained = True, depth_branch = False):
+        super(encoder_mobilenet_small, self).__init__()
+
+        mobilenet = mobilenet_v3_small(weights='IMAGENET1K_V1').features if pretrained else mobilenet_v3_small().features
+
+        if depth_branch:
+            self.stem_layers = nn.Sequential(
+                                        nn.Conv2d(1, 16, 
+                                                  kernel_size=(3, 3), 
+                                                  stride=(2, 2), 
+                                                  padding=(1, 1), 
+                                                  bias=False),
+                                        nn.BatchNorm2d(16, eps=0.001, momentum=0.01, affine=True, track_running_stats=True),
+                                        nn.Hardswish(),
+                                        *list(mobilenet.children())[1:2])                     
+        else:
+            self.stem_layers = nn.Sequential(
+                                        *list(mobilenet.children())[:2])
+            
+        self.layer_1 = nn.Sequential(*list(mobilenet.children())[2:4])
+        self.layer_2 = nn.Sequential(*list(mobilenet.children())[4:8])
+        self.layer_3 = nn.Sequential(*list(mobilenet.children())[8:12])
+
+    def forward(self, image):
+        x1 = self.stem_layers(image)
+        x2 = self.layer_1(x1)
+        x3 = self.layer_2(x2)
+        x4 = self.layer_3(x3)
+
+        return x1, x2, x3, x4
+            
+        
 # encoder made from scratch
 class conv_block(nn.Module):
     def __init__(self, in_ch, out_ch = None, 
