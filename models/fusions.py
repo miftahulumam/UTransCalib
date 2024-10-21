@@ -6,6 +6,7 @@ from models.realignment_layer import realignment_layer
 import torch.nn.functional as F
 
 from .basic_blocks import SingleConv, DoubleConv, Residual_DoubleConv
+from .attentions import hydra_channel_attention, linear_channel_attention, spatial_attention
 
 # FEATURE MATCHING // FEATURE FUSION  
 
@@ -300,5 +301,182 @@ class feature_fusion_2maps(nn.Module):
         z4 = torch.unsqueeze(z4, 2).expand_as(x4)
 
         out = torch.mul(x3,z3) + torch.mul(x4,z4)
+
+        return out
+
+### proposed
+class hybrid_attentive_fusion_s(nn.Module):
+    def __init__(self, 
+                 channels = [64, 128, 256, 512], 
+                 fusion_attn_repeat = None,
+                 fc_reduction = 16, 
+                 depthwise=True, 
+                 activation='nn.SiLU(inplace=True)',
+                 drop_rate=0.1):
+        super(hybrid_attentive_fusion_s, self).__init__()
+
+        self.fusion_attn_repeat = fusion_attn_repeat
+
+        self.single_downsampler = SingleConv(channels[2], channels[2], 2, 
+                                             depthwise, activation, drop_rate)
+        
+        self.double_downsampler = nn.Sequential(
+            SingleConv(channels[1], channels[1], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[1], channels[1], 2, depthwise, activation, drop_rate)
+        )
+        
+        self.triple_downsampler = nn.Sequential(
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate)
+        )
+
+        # fusion attention
+        if self.fusion_attn_repeat == 0 or self.fusion_attn_repeat == None:
+            self.spatial_attn = spatial_attention(sum(channels), reduction=fc_reduction)
+            self.channel_attn = hydra_channel_attention(sum(channels))
+        else:
+            self.spatial_attn = nn.ModuleList()
+            self.channel_attn = nn.ModuleList()
+
+            for _ in range(self.fusion_attn_repeat):
+                self.spatial_attn.append(spatial_attention(sum(channels), reduction=fc_reduction))
+                self.channel_attn.append(hydra_channel_attention(sum(channels)))
+
+    def forward(self, x1, x2, x3, x4):
+        
+        x1 = self.triple_downsampler(x1)
+        x2 = self.double_downsampler(x2)
+        x3 = self.single_downsampler(x3)
+
+        x = torch.cat((x1, x2, x3, x4), dim=1)
+
+        B, C, H, W = x.shape
+
+        if self.fusion_attn_repeat == 0 or self.fusion_attn_repeat == None:
+            x_sp_attn = self.spatial_attn(x)
+
+            x_ch_attn = x.view(B, C, H*W).permute(0, 2, 1)
+            x_ch_attn = self.channel_attn(x_ch_attn).permute(0, 2, 1).reshape(B, C, H, W)
+
+            out = torch.cat((x_sp_attn, x_ch_attn), dim=1)
+
+        else:
+            repeat_x = x
+
+            for sa, ca in zip(self.spatial_attn, self.channel_attn):
+                x_sp_attn = sa(repeat_x)
+
+                x_ch_attn = repeat_x.view(B, C, H*W).permute(0, 2, 1)
+                x_ch_attn = ca(x_ch_attn).permute(0, 2, 1).reshape(B, C, H, W)
+
+                repeat_x = x_sp_attn + x_ch_attn
+            
+            out = repeat_x
+
+        return out
+
+### proposed
+class hybrid_attentive_fusion_l(nn.Module):
+    def __init__(self, 
+                 channels = [64, 128, 256, 512], 
+                 branch_attn_repeat = 1,
+                 fusion_attn_repeat = None, # if none, concat; else, add
+                 fc_reduction = 16, 
+                 depthwise=True, 
+                 activation='nn.SiLU(inplace=True)',
+                 drop_rate=0.1):
+        super(hybrid_attentive_fusion_l, self).__init__()
+
+        self.branch_attn_repeat = branch_attn_repeat
+        self.fusion_attn_repeat = fusion_attn_repeat
+
+        self.single_downsampler = SingleConv(channels[2], channels[2], 2, 
+                                             depthwise, activation, drop_rate)
+        
+        self.double_downsampler = nn.Sequential(
+            SingleConv(channels[1], channels[1], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[1], channels[1], 2, depthwise, activation, drop_rate)
+        )
+        
+        self.triple_downsampler = nn.Sequential(
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate),
+            SingleConv(channels[0], channels[0], 2, depthwise, activation, drop_rate)
+        )
+
+        # branch attentions
+        self.branch_1_attn = nn.ModuleList() 
+        self.branch_2_attn = nn.ModuleList() 
+        self.branch_3_attn = nn.ModuleList() 
+        self.branch_4_attn = nn.ModuleList()
+
+        if self.branch_attn_repeat == 0 or self.branch_attn_repeat == None:
+            self.branch_1_attn.append(nn.Identity())
+            self.branch_2_attn.append(nn.Identity())
+            self.branch_3_attn.append(nn.Identity())
+            self.branch_4_attn.append(nn.Identity())
+
+        else:
+            for _ in range(self.branch_attn_repeat):
+                self.branch_1_attn.append(spatial_attention(channels[0], reduction=fc_reduction))
+                self.branch_2_attn.append(spatial_attention(channels[1], reduction=fc_reduction))
+                self.branch_3_attn.append(spatial_attention(channels[2], reduction=fc_reduction))
+                self.branch_4_attn.append(spatial_attention(channels[3], reduction=fc_reduction))
+
+        # fusion attention
+        if self.fusion_attn_repeat == 0 or self.fusion_attn_repeat == None:
+            self.spatial_attn = spatial_attention(sum(channels), reduction=fc_reduction)
+            self.channel_attn = hydra_channel_attention(sum(channels))
+
+        else:
+            self.spatial_attn = nn.ModuleList()
+            self.channel_attn = nn.ModuleList()
+
+            for _ in range(self.fusion_attn_repeat):
+                self.spatial_attn.append(spatial_attention(sum(channels), reduction=fc_reduction))
+                self.channel_attn.append(hydra_channel_attention(sum(channels)))
+
+    def forward(self, x1, x2, x3, x4):
+        
+        x1 = self.triple_downsampler(x1)
+        x2 = self.double_downsampler(x2)
+        x3 = self.single_downsampler(x3)
+
+        # branch attentions
+        for attn_1, attn_2, attn_3, attn_4 in zip(self.branch_1_attn, 
+                                                  self.branch_2_attn,
+                                                  self.branch_3_attn, 
+                                                  self.branch_4_attn):
+            x1 = attn_1(x1)
+            x2 = attn_2(x2)
+            x3 = attn_3(x3)
+            x4 = attn_4(x4) 
+
+        x = torch.cat((x1, x2, x3, x4), dim=1)
+
+        # fusion attention
+        B, C, H, W = x.shape
+
+        if self.fusion_attn_repeat == 0 or self.fusion_attn_repeat == None:
+            x_sp_attn = self.spatial_attn(x)
+
+            x_ch_attn = x.view(B, C, H*W).permute(0, 2, 1)
+            x_ch_attn = self.channel_attn(x_ch_attn).permute(0, 2, 1).reshape(B, C, H, W)
+
+            out = torch.cat((x_sp_attn, x_ch_attn), dim=1)
+
+        else:
+            repeat_x = x
+
+            for sa, ca in zip(self.spatial_attn, self.channel_attn):
+                x_sp_attn = sa(repeat_x)
+
+                x_ch_attn = repeat_x.view(B, C, H*W).permute(0, 2, 1)
+                x_ch_attn = ca(x_ch_attn).permute(0, 2, 1).reshape(B, C, H, W)
+
+                repeat_x = x_sp_attn + x_ch_attn
+            
+            out = repeat_x
 
         return out

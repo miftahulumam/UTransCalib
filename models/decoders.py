@@ -8,6 +8,41 @@ import torch.nn.functional as F
 from .basic_blocks import SingleConv, DoubleConv, Residual_DoubleConv
 from .basic_blocks import upsampling, Residual_upsampling
 
+class decoder(nn.Module):
+    def __init__(self, 
+                 in_channels=[64, 128, 256, 512], # from large dimension to small dimension
+                 bilinear=True, 
+                 depthwise=True, 
+                 activation='nn.SiLU(inplace=True)', 
+                 drop_rate=0.1):
+        super(decoder, self).__init__()
+
+        self.n_stage = len(in_channels) - 1
+
+        self.up = nn.ModuleList()
+        for i in range(self.n_stage):
+            self.up.append(upsampling(
+                            in_channels[-1-i] + in_channels[-2-i], 
+                            in_channels[-2-i],
+                            bilinear, depthwise, activation, drop_rate))
+            
+    def forward(self, input):
+        assert len(input) == self.n_stage + 1
+
+        output = [input[-1]] 
+        small_map = input[-1]
+
+        for i, up in enumerate(self.up):
+            large_map = input[-2-i]
+            out = up(small_map, large_map)
+            output.insert(0, out)
+
+            small_map = out
+        
+        assert len(input) == len(output)
+
+        return output
+
 class decoder_full(nn.Module):
     def __init__(self, 
                  in_ch, out_ch=None, 

@@ -14,38 +14,49 @@ class hydra_channel_attention(nn.Module):
                  attn_drop=0., proj_drop=0.):
         super(hydra_channel_attention, self).__init__()
 
-        self.norm_layer = norm_layer(in_dim)
+        self.norm_layer_in = norm_layer(in_dim)
 
         self.emb_dim = in_dim if emb_dim is None else emb_dim
 
         self.Wq_Wk_Wv = nn.Linear(in_dim, self.emb_dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(self.emb_dim, in_dim, bias=qkv_bias)
 
+        self.norm_layer_out = norm_layer(self.emb_dim)
+
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj_drop = nn.Dropout(proj_drop)
 
 
     def forward(self, x):
-        B, N, C = x.shape
+        B, N, _ = x.shape
 
-        print(B, N, C)
+        # print(B, N, C)
 
-        x = self.norm_layer(x)
-        # print(x.shape)
-        qkv = self.Wq_Wk_Wv(x).reshape(B, N, C, 3, 1).permute(3, 0, 2, 4, 1)
+        x = self.norm_layer_in(x)
+        # print("normed x", x.shape)
+        
+        qkv = self.Wq_Wk_Wv(x).reshape(B, N, self.emb_dim, 3, 1).permute(3, 0, 2, 4, 1)
+        # print("qkv", qkv.shape)
         q, k, v = qkv[0], qkv[1], qkv[2]
+        # print(q.shape, k.shape, v.shape)
 
         phi_q = nn.functional.normalize(q, dim=1)
         phi_k = nn.functional.normalize(k, dim=1)
 
         kv = torch.sum(phi_k.mul(v), dim=-1)
+        kv = self.attn_drop(kv)
+        # print("q", phi_q.shape, "k", phi_k.shape, "v", v.shape, "kv", kv.shape)
 
-        attn = phi_q*torch.unsqueeze(kv, dim=-1).expand_as(phi_q)
-        # print(attn.shape)
+        attn = phi_q*(torch.unsqueeze(kv, dim=-1).expand_as(phi_q))
+        # print("attn", attn.shape)
         attn = torch.squeeze(attn).permute(0, 2, 1)
+        # print("attn", attn.shape)
 
-        x = self.proj(attn)
+        x = self.norm_layer_out(attn)
+        x = self.proj(x)
         x = self.proj_drop(x)
+
+        # print("attn out", x.shape)
 
         return x
     
@@ -58,36 +69,46 @@ class linear_channel_attention(nn.Module):
                  attn_drop=0., proj_drop=0.):
         super(linear_channel_attention, self).__init__()
 
-        self.norm_layer = norm_layer(in_dim)
+        self.norm_layer_in = norm_layer(in_dim)
 
         self.emb_dim = in_dim if emb_dim is None else emb_dim
 
         self.Wq_Wk_Wv = nn.Linear(in_dim, self.emb_dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(self.emb_dim, in_dim, bias=qkv_bias)
 
+        self.norm_layer_out = norm_layer(self.emb_dim)
+
         self.attn_drop = nn.Dropout(attn_drop)
         self.proj_drop = nn.Dropout(proj_drop)
 
     def forward(self, x):
-        B, N, C = x.shape
+        B, N, _ = x.shape
 
-        x = self.norm_layer(x)
-        # print(x.shape)
-        qkv = self.Wq_Wk_Wv(x).reshape(B, N, C, 3).permute(3, 0, 1, 2)
+        x = self.norm_layer_in(x)
+        # print("normed x", x.shape)
+        qkv = self.Wq_Wk_Wv(x).reshape(B, N, self.emb_dim, 3).permute(3, 0, 1, 2)
+        # print("qkv", qkv.shape)
         q, k, v = qkv[0], qkv[1], qkv[2]
+        # print("q", q.shape, "k", k.shape, "v", v.shape)
 
         phi_q = torch.softmax(q, dim=2)
         phi_k = torch.softmax(k, dim=1)
+        # print("phi q", q.shape, "phi k", k.shape)
 
         kv = torch.bmm(phi_k.transpose(1, 2), v)
+        kv = self.attn_drop(kv)
+        # print("kv", kv.shape)
         attn = torch.bmm(phi_q, kv)
 
-        print(kv.shape, attn.shape)
+        # print("attn", attn.shape)
 
-        x = self.proj(attn)
+        x = self.norm_layer_out(attn)
+        x = self.proj(x)
         x = self.proj_drop(x)
-        
-        return attn
+
+        # print("attn out", x.shape)
+
+        return x
     
 class spatial_attention(nn.Module):
     def __init__(self, in_ch, reduction, act_layer=nn.SiLU):

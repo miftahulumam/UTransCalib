@@ -7,11 +7,27 @@ import torch.nn.functional as F
 
 from torchvision.models import resnet18, densenet121, mobilenet_v3_small
 
+def replace_layers(model, old, new):
+    for n, module in model.named_children():
+        if len(list(module.children())) > 0:
+            ## compound module, go inside it
+            replace_layers(module, old, new)
+            
+        if isinstance(module, old):
+            ## simple module
+            setattr(model, n, new)
+
+    return model
+
 class encoder_resnet(nn.Module):
-    def __init__(self, pretrained = True, depth_branch = False):
+    def __init__(self, pretrained = True, depth_branch = False, activation=None):
         super(encoder_resnet, self).__init__()
         
         resnet = resnet18(weights='IMAGENET1K_V1') if pretrained else resnet18()
+
+        if activation is not None:
+            new_act = eval(activation)
+            resnet = replace_layers(resnet, nn.ReLU, new_act)
 
         if depth_branch:
             resnet.conv1 = nn.Conv2d(1, 
@@ -36,11 +52,15 @@ class encoder_resnet(nn.Module):
         return x1, x2, x3, x4
     
 class encoder_densenet(nn.Module):
-    def __init__(self, pretrained = True, depth_branch = False):
+    def __init__(self, pretrained = True, depth_branch = False, activation = None):
         super(encoder_densenet, self).__init__()
 
         densenet = densenet121(weights='IMAGENET1K_V1').features if pretrained else densenet121().features
 
+        if activation is not None:
+            new_act = eval(activation)
+            densenet = replace_layers(densenet, nn.ReLU, new_act)
+        
         if depth_branch:
             self.stem_layers = nn.Sequential(
                                         nn.Conv2d(1, 64, 
@@ -83,11 +103,15 @@ class encoder_densenet(nn.Module):
         return x1, x2, x3, x4
     
 class encoder_mobilenet_small(nn.Module):
-    def __init__(self, pretrained = True, depth_branch = False):
+    def __init__(self, pretrained = True, depth_branch = False, activation = None):
         super(encoder_mobilenet_small, self).__init__()
 
         mobilenet = mobilenet_v3_small(weights='IMAGENET1K_V1').features if pretrained else mobilenet_v3_small().features
 
+        if activation is not None:
+            new_act = eval(activation)
+            mobilenet = replace_layers(mobilenet, nn.ReLU, new_act)
+        
         if depth_branch:
             self.stem_layers = nn.Sequential(
                                         nn.Conv2d(1, 16, 
@@ -104,7 +128,7 @@ class encoder_mobilenet_small(nn.Module):
             
         self.layer_1 = nn.Sequential(*list(mobilenet.children())[2:4])
         self.layer_2 = nn.Sequential(*list(mobilenet.children())[4:8])
-        self.layer_3 = nn.Sequential(*list(mobilenet.children())[8:12])
+        self.layer_3 = nn.Sequential(*list(mobilenet.children())[8:])
 
     def forward(self, image):
         x1 = self.stem_layers(image)
