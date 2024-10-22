@@ -19,9 +19,11 @@ from .decoders import (decoder,
 
 from .fusions import (feature_fusion_full, 
                       feature_fusion_3maps, 
-                      feature_fusion_2maps)
+                      feature_fusion_2maps,
+                      hybrid_attentive_fusion,
+                      hybrid_attentive_fusion_lite)
 
-from .heads import global_regression_v1
+from .heads import global_regression_v1, global_regression_v2
 
 class UTransCalib_model_resnet(nn.Module):
     def __init__(self, model_config):
@@ -255,10 +257,16 @@ class UTranscalib_mobilenet(nn.Module):
         self.rgb_encd = encoder_mobilenet_small(pretrained=True)
         self.depth_encd = encoder_mobilenet_small(pretrained=False, depth_branch=True)
 
-        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 576], activation=activation)
-        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 576], activation=activation)
+        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 96], activation=activation)
+        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 96], activation=activation)
 
-        ########
+        self.fusion_attn = hybrid_attentive_fusion([32, 48, 96, 192],
+                                                   branch_attn_repeat=1,
+                                                   fusion_attn_repeat=2)
+        
+        self.global_regression = global_regression_v2(in_channel=368)
+        
+        self.recalib = realignment_layer()
         
         if init_weights:
             for m in self.modules():
@@ -285,4 +293,16 @@ class UTranscalib_mobilenet(nn.Module):
         x3 = torch.cat((x3_rgb, x3_depth), dim=1)
         x4 = torch.cat((x4_rgb, x4_depth), dim=1)
 
-        return x1, x2, x3, x4
+        fused_map = self.fusion_attn(x1, x2, x3, x4)
+
+        delta_t_pred, delta_q_pred = self.global_regression(fused_map)
+
+        if delta_q_pred.ndim < 2:
+            delta_q_pred = torch.unsqueeze(delta_q_pred, 0)
+            delta_t_pred = torch.unsqueeze(delta_t_pred, 0)
+
+        delta_q_pred = nn.functional.normalize(delta_q_pred)
+        
+        batch_T_pred, pcd_pred = self.recalib(pcd_mis, T_mis_batch, delta_q_pred, delta_t_pred)
+
+        return pcd_pred, batch_T_pred, delta_q_pred, delta_t_pred

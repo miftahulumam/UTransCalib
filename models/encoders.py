@@ -128,7 +128,7 @@ class encoder_mobilenet_small(nn.Module):
             
         self.layer_1 = nn.Sequential(*list(mobilenet.children())[2:4])
         self.layer_2 = nn.Sequential(*list(mobilenet.children())[4:8])
-        self.layer_3 = nn.Sequential(*list(mobilenet.children())[8:])
+        self.layer_3 = nn.Sequential(*list(mobilenet.children())[8:12])
 
     def forward(self, image):
         x1 = self.stem_layers(image)
