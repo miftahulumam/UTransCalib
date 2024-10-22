@@ -305,7 +305,7 @@ class feature_fusion_2maps(nn.Module):
         return out
 
 ### proposed
-class hybrid_attentive_fusion_s(nn.Module):
+class hybrid_attentive_fusion_lite(nn.Module):
     def __init__(self, 
                  channels = [64, 128, 256, 512], 
                  fusion_attn_repeat = None,
@@ -313,7 +313,7 @@ class hybrid_attentive_fusion_s(nn.Module):
                  depthwise=True, 
                  activation='nn.SiLU(inplace=True)',
                  drop_rate=0.1):
-        super(hybrid_attentive_fusion_s, self).__init__()
+        super(hybrid_attentive_fusion_lite, self).__init__()
 
         self.fusion_attn_repeat = fusion_attn_repeat
 
@@ -377,7 +377,7 @@ class hybrid_attentive_fusion_s(nn.Module):
         return out
 
 ### proposed
-class hybrid_attentive_fusion_l(nn.Module):
+class hybrid_attentive_fusion(nn.Module):
     def __init__(self, 
                  channels = [64, 128, 256, 512], 
                  branch_attn_repeat = 1,
@@ -386,7 +386,7 @@ class hybrid_attentive_fusion_l(nn.Module):
                  depthwise=True, 
                  activation='nn.SiLU(inplace=True)',
                  drop_rate=0.1):
-        super(hybrid_attentive_fusion_l, self).__init__()
+        super(hybrid_attentive_fusion, self).__init__()
 
         self.branch_attn_repeat = branch_attn_repeat
         self.fusion_attn_repeat = fusion_attn_repeat
