@@ -257,14 +257,14 @@ class UTranscalib_mobilenet(nn.Module):
         self.rgb_encd = encoder_mobilenet_small(pretrained=True)
         self.depth_encd = encoder_mobilenet_small(pretrained=False, depth_branch=True)
 
-        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 96], activation=activation)
-        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 96], activation=activation)
+        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 128], activation=activation)
+        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 128], activation=activation)
 
-        self.fusion_attn = hybrid_attentive_fusion([32, 48, 96, 192],
+        self.fusion_attn = hybrid_attentive_fusion([32, 48, 96, 256],
                                                    branch_attn_repeat=1,
                                                    fusion_attn_repeat=2)
         
-        self.global_regression = global_regression_v2(in_channel=368)
+        self.global_regression = global_regression_v2(in_channel=432)
         
         self.recalib = realignment_layer()
         
