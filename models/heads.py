@@ -56,10 +56,8 @@ class global_regression_v1(nn.Module):
     
 class global_regression_v2(nn.Module):
     def __init__(self, 
-                 in_channel, 
-                 depthwise=True, 
+                 in_channel,  
                  activation='nn.ReLU(inplace=True)', 
-                 drop_rate=0.1, 
                  fc_drop_rate=0.3):
         super(global_regression_v2, self).__init__()
 

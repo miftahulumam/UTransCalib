@@ -251,20 +251,45 @@ class UTranscalib_mobilenet(nn.Module):
     def __init__(self, model_config):
         super(UTranscalib_mobilenet, self).__init__()
 
-        activation = model_config.activation
+        # hyperparameters config
+        rgb_activation = model_config.rgb_activation
+        depth_activation = model_config.depth_activation
+        fusion_activation = model_config.fusion_activation
+        regr_activation = model_config.regression_activation
+
+        fusion_reduction = model_config.fusion_reduction
+        decoder_drop_rate = model_config.decoder_drop_rate
+        head_drop_rate = model_config.head_drop_rate
+
+        branch_attn_repeat = model_config.branch_attn_repeat
+        fusion_attn_repeat = model_config.fusion_attn_repeat
         init_weights = model_config.init_weights
 
-        self.rgb_encd = encoder_mobilenet_small(pretrained=True)
-        self.depth_encd = encoder_mobilenet_small(pretrained=False, depth_branch=True)
+        # encoders
+        self.rgb_encd = encoder_mobilenet_small(pretrained=True, 
+                                                activation=rgb_activation)
+        self.depth_encd = encoder_mobilenet_small(pretrained=False, 
+                                                  depth_branch=True, 
+                                                  activation=depth_activation)
 
-        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 128], activation=activation)
-        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 128], activation=activation)
+        # decoders
+        self.rgb_decdr = decoder(in_channels=[16, 24, 48, 128], 
+                                 drop_rate=decoder_drop_rate,
+                                 activation=rgb_activation)
+        self.depth_dcdr = decoder(in_channels=[16, 24, 48, 128],
+                                  drop_rate=decoder_drop_rate, 
+                                  activation=depth_activation)
 
+        # fusion
         self.fusion_attn = hybrid_attentive_fusion([32, 48, 96, 256],
-                                                   branch_attn_repeat=1,
-                                                   fusion_attn_repeat=2)
+                                                   branch_attn_repeat=branch_attn_repeat,
+                                                   fusion_attn_repeat=fusion_attn_repeat,
+                                                   fc_reduction=fusion_reduction,
+                                                   activation=fusion_activation)
         
-        self.global_regression = global_regression_v2(in_channel=432)
+        self.global_regression = global_regression_v2(in_channel=432, 
+                                                      activation=regr_activation,
+                                                      fc_drop_rate=head_drop_rate)
         
         self.recalib = realignment_layer()
         

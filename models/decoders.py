@@ -14,7 +14,7 @@ class decoder(nn.Module):
                  bilinear=True, 
                  depthwise=True, 
                  activation='nn.SiLU(inplace=True)', 
-                 drop_rate=0.1):
+                 drop_rate=0.0):
         super(decoder, self).__init__()
 
         self.n_stage = len(in_channels) - 1

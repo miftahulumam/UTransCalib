@@ -18,10 +18,21 @@ config_UTransCalib_densenet_oct20 = {
     'init_weights': True
 }
 
-config_UTransCalib_mobilenet_oct20 = {
-    'model_name': 'UTransCalib_mobilenet_oct20',
-    'activation': 'nn.SiLU(inplace=True)',
-    'depth_activation': 'nn.SiLU(inplace=True)',
+config_UTransCalib_mobilenet_oct24 = {
+    'model_name': 'UTransCalib_mobilenet_oct24',
+
     'rgb_activation': 'nn.SiLU(inplace=True)',
+    'depth_activation': 'nn.LeakyReLU(negative_slope=0.1, inplace=True)',
+    'fusion_activation': 'nn.SiLU(inplace=True)',
+    'regression_activation': 'nn.ReLU(inplace=True)',
+
+    'decoder_drop_rate': 0.1,
+    'fusion_reduction': 4,
+
+    'branch_attn_repeat': 1,
+    'fusion_attn_repeat': 2,
+
+    'head_drop_rate': 0.3,
+
     'init_weights': False
 }
