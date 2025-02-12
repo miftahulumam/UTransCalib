@@ -49,7 +49,8 @@ class hydra_channel_attention(nn.Module):
 
         attn = phi_q*(torch.unsqueeze(kv, dim=-1).expand_as(phi_q))
         # print("attn", attn.shape)
-        attn = torch.squeeze(attn).permute(0, 2, 1)
+
+        attn = torch.squeeze(attn, dim=2).permute(0, 2, 1)
         # print("attn", attn.shape)
 
         x = self.norm_layer_out(attn)
