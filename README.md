@@ -1,5 +1,5 @@
 # Lightweight LiDAR-Camera Extrinsic Calibration
-(This documentation and repository is still under development)
+**(This documentation and repository is still under development)**
 
 This repository provides a project about deep-learning-based targetless extrinsic calibration for LiDAR--Camera system.
 
