@@ -18,9 +18,7 @@ This repository provides a project about deep-learning-based targetless extrinsi
 
 ## About the Project 
 This project was part of the sensor fusion and computer fusion research project at [WiComAI Lab](https://wireless.kookmin.ac.kr/) of Kookmin University, Seoul, South Korea. 
-The project aims to predicts the misalignment in the extrinsic parameters between the camera and LiDAR by leveraging a modified [MobileNet V3 Small](https://arxiv.org/abs/1905.02244) 
-as feature extraction network and a modified attention as feature matching network. The deep learning network is trained 
-and tested using the [KITTI Odometry dataset](https://www.cvlibs.net/datasets/kitti/eval_odometry.php).
+The project aims to predicts the misalignment in the extrinsic parameters between the camera and LiDAR by leveraging a modified [MobileNet V3 Small](https://arxiv.org/abs/1905.02244) with upsampling layers to form a feature pyramid as feature extraction network and a modified attention as feature matching network. The deep learning network is trained and tested using the [KITTI Odometry dataset](https://www.cvlibs.net/datasets/kitti/eval_odometry.php).
 
 #### Problem Formulation
 Extrinsic parameters in LiDAR-Camera system is used to perform coordinate transformation of 3D poinnts from LiDAR coordinate system to camera coordinate system.
